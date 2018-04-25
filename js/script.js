@@ -85,6 +85,9 @@ window.onload = function() {
 	let baseBoneRotation = (new THREE.Quaternion).setFromEuler(
 		new THREE.Euler(Math.PI / 2, 0, 0)
 	);
+	let armRotation = (new THREE.Quaternion).setFromEuler(
+		new THREE.Euler(Math.PI / 12, 0, 0)
+	);
 	let giftBump = new THREE.TextureLoader().load('images/5.jpg');
 	//https://developer.leapmotion.com/gallery/bone-hands -- plugin
 	Leap.loop({ background: false }, {
@@ -112,14 +115,23 @@ window.onload = function() {
 					});
 				});
 				let armMesh = hand.data('armMesh');
-				// debugger
-				armMesh.position.fromArray(hand.arm.center());
+				armMesh.position.fromArray(hand.fingers[2].bones[0].center());
 				armMesh.setRotationFromMatrix(
-					(new THREE.Matrix4).fromArray(hand.arm.matrix())
+					(new THREE.Matrix4).fromArray(hand.fingers[2].bones[0].matrix())
 				);
-				armMesh.quaternion.multiply(baseBoneRotation);
-				armMesh.scale.x = hand.arm.width / 2;
-				armMesh.scale.z = hand.arm.width / 2;
+				// armMesh.quaternion.multiply(armRotation);
+				// debugger
+				// armMesh.position.fromArray(hand.arm.center());
+				// armMesh.position.fromArray(hand.palmPosition);
+				// armMesh.rotation.fromArray(hand.palmNormal);
+
+				// console.log(hand.palmNormal)
+				// armMesh.setRotationFromMatrix(
+				// 	(new THREE.Matrix4).fromArray(hand.arm.matrix())
+				// );
+				// armMesh.quaternion.multiply(baseBoneRotation);
+				// armMesh.scale.x = hand.arm.width / 2;
+				// armMesh.scale.z = hand.arm.width / 2;
 			}
 		})
 		// these two LeapJS plugins, handHold and handEntry are available from leapjs-plugins, included above.
@@ -201,9 +213,9 @@ window.onload = function() {
 				// CylinderGeometry(radiusTop, radiusBottom, height, radiusSegments, heightSegments, openEnded)
 				let armMesh = new THREE.Mesh(
 					new THREE.CylinderGeometry(2.5,.9,hand.arm.length + 10,32,2),
-					new THREE.MeshStandardMaterial({metalness: 0.8, roughness: 0.5, color:0x8c0000, envMap: textureCube})
+					new THREE.MeshStandardMaterial({metalness: 0.9, roughness: 0.4, color:0x450000, envMap: textureCube})
 				);
-				armMesh.material.color.setHex(0xffffff);
+				// armMesh.material.color.setHex(0xffffff);
 				scene.add(armMesh);
 				hand.data('armMesh', armMesh);
 			}
