@@ -5,13 +5,13 @@ window.onload = function() {
 	let camera, renderer, light, controls, stats, textureCube;
 
 	function initScene() {
-		camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 10000);
+		camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 9000);
 		renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas }); // antialias - сглаживаем ребра
 		camera.position.set(0, 0, 600);
 		camera.rotation.set(-0.72, 0, 0);
 		renderer.shadowMap.enabled = true;
 		renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-		renderer.setPixelRatio(window.devicePixelRatio > 1 ? 2 : 1);
+		// renderer.setPixelRatio(window.devicePixelRatio > 1 ? 2 : 1);
 		renderer.setSize(window.innerWidth, window.innerHeight);
 		renderer.gammaInput = renderer.gammaOutput = true;
 		renderer.toneMapping = THREE.LinearToneMapping;
@@ -28,6 +28,7 @@ window.onload = function() {
 	let videosArray = [],
 		videoWidth = 300,
 		catalogueMesh = new THREE.Group();
+		window.z = videosArray;
 	// video.src = "video3.webm";
 	// video.load(); // must call after setting/changing source
 	// video.play();
@@ -58,9 +59,9 @@ window.onload = function() {
 		for (let video in videosCatalogue) {
 			createVideos(videosCatalogue[video])
 		}
-		catalogueMesh.position.set(0, 0,-300)
+		catalogueMesh.position.set(0, 200, -300)
 		scene.add(catalogueMesh);
-		videosArray[0].play();
+		// videosArray[0].play();
 	}
 
 	function createVideos(videoItem) {
@@ -97,8 +98,8 @@ window.onload = function() {
 		light.position.set(100, 500, -650);
 		light.position.multiplyScalar(1.3);
 		light.castShadow = true;
-		light.shadow.mapSize.width = 1024;
-		light.shadow.mapSize.height = 1024;
+		light.shadow.mapSize.width = 256;
+		light.shadow.mapSize.height = 256;
 		light.shadow.camera.left = -d;
 		light.shadow.camera.right = d;
 		light.shadow.camera.top = d;
@@ -155,66 +156,147 @@ window.onload = function() {
 	let giftBump = new THREE.TextureLoader().load('images/5.jpg');
 	//https://developer.leapmotion.com/gallery/bone-hands -- plugin
 	let convertedRotationMatrix;
-	Leap.loop({ background: false }, {
-			hand: function(hand) {
-				hand.fingers.forEach(function(finger) {
-					finger.data('boneMeshes').forEach(function(mesh, i) {
-						let bone = finger.bones[i];
-						mesh.position.fromArray(bone.center());
-						mesh.setRotationFromMatrix(
-							(new THREE.Matrix4).fromArray(bone.matrix())
-						);
-						mesh.quaternion.multiply(baseBoneRotation);
-					});
-					finger.data('jointMeshes').forEach(function(mesh, i) {
-						let bone = finger.bones[i];
-						if (bone) {
-							mesh.position.fromArray(bone.prevJoint);
-						} else {
-							// special case for the finger tip joint sphere:
-							bone = finger.bones[i - 1];
-							mesh.position.fromArray(bone.nextJoint);
+	Leap.loop({ background: false, enableGestures: true },
+			function(frame) {
+				// debugger
+				// console.log(frame);
+				if (frame.valid && frame.gestures.length > 0) {
+					frame.gestures.forEach(function(gesture) {
+						switch (gesture.type) {
+							case "circle":
+								console.log("Circle Gesture");
+								break;
+							case "keyTap":
+								console.log("Key Tap Gesture");
+								break;
+							case "screenTap":
+								console.log("Screen Tap Gesture");
+								break;
+							case "swipe":
+								console.log("Swipe Gesture");
+								break;
 						}
 					});
-				});
-				let engineBodyMesh = hand.data('engineBodyMesh');
-				let convertedPositionMatrix = hand.fingers[2].bones[0].center().map(function(value) {
-					return value;
-				});
-				convertedPositionMatrix[1] = convertedPositionMatrix[1] - 50;
-				engineBodyMesh.position.fromArray(convertedPositionMatrix);
+				} 
+				frame.hands.forEach(function(hand) {
+					hand.fingers.forEach(function(finger) {
+							finger.data('boneMeshes').forEach(function(mesh, i) {
+								let bone = finger.bones[i];
+								mesh.position.fromArray(bone.center());
+								mesh.setRotationFromMatrix(
+									(new THREE.Matrix4).fromArray(bone.matrix())
+								);
+								mesh.quaternion.multiply(baseBoneRotation);
+							});
+							finger.data('jointMeshes').forEach(function(mesh, i) {
+								let bone = finger.bones[i];
+								if (bone) {
+									mesh.position.fromArray(bone.prevJoint);
+								} else {
+									// special case for the finger tip joint sphere:
+									bone = finger.bones[i - 1];
+									mesh.position.fromArray(bone.nextJoint);
+								}
+							});
+						});
+						let engineBodyMesh = hand.data('engineBodyMesh');
+						let convertedPositionMatrix = hand.fingers[2].bones[0].center().map(function(value) {
+							return value;
+						});
+						convertedPositionMatrix[1] = convertedPositionMatrix[1] - 50;
+						engineBodyMesh.position.fromArray(convertedPositionMatrix);
 
-				let convertedRotationMatrix = hand.fingers[2].bones[0].matrix().map(function(value) {
-					return value;
-				});
-				// console.log(convertedRotationMatrix)
-				// convertedRotationMatrix = new THREE.Matrix4).fromArray(convertedRotationMatrix);
-				// convertedRotationMatrix[12] = convertedRotationMatrix[12] *2;
-				// console.log(hand.palmNormal)
-				// convertedRotationMatrix.makeRotationAxis(new THREE.Vector3(hand.palmNormal).normalize(),(90 * 3.14 / 180));
-				// convertedRotationMatrix = (new THREE.Matrix4).fromArray(convertedRotationMatrix)
-				// convertedRotationMatrix = convertedRotationMatrix.makeRotationAxis(hand.palmNormal,90 * 3.14 / 180)
-				// convertedRotationMatrix.setPosition(new THREE.Vector3(2, 1, 2))
-				// convertedRotationMatrix.transpose();
-				// console.log(convertedRotationMatrix)
-				// engineBodyMesh.setRotationFromMatrix(
-				// 	convertedRotationMatrix
-				// );
-				// engineBodyMesh.quaternion.multiply(armRotation);
-				// debugger
-				// armMesh.position.fromArray(hand.arm.center());
-				// armMesh.position.fromArray(hand.palmPosition);
-				// armMesh.rotation.fromArray(hand.palmNormal);
+						let convertedRotationMatrix = hand.fingers[2].bones[0].matrix().map(function(value) {
+							return value;
+						});
+						// console.log(convertedRotationMatrix)
+						// convertedRotationMatrix = new THREE.Matrix4).fromArray(convertedRotationMatrix);
+						// convertedRotationMatrix[12] = convertedRotationMatrix[12] *2;
+						// console.log(hand.palmNormal)
+						// convertedRotationMatrix.makeRotationAxis(new THREE.Vector3(hand.palmNormal).normalize(),(90 * 3.14 / 180));
+						// convertedRotationMatrix = (new THREE.Matrix4).fromArray(convertedRotationMatrix)
+						// convertedRotationMatrix = convertedRotationMatrix.makeRotationAxis(hand.palmNormal,90 * 3.14 / 180)
+						// convertedRotationMatrix.setPosition(new THREE.Vector3(2, 1, 2))
+						// convertedRotationMatrix.transpose();
+						// console.log(convertedRotationMatrix)
+						// engineBodyMesh.setRotationFromMatrix(
+						// 	convertedRotationMatrix
+						// );
+						// engineBodyMesh.quaternion.multiply(armRotation);
+						// debugger
+						// armMesh.position.fromArray(hand.arm.center());
+						// armMesh.position.fromArray(hand.palmPosition);
+						// armMesh.rotation.fromArray(hand.palmNormal);
 
-				// console.log(hand.palmNormal)
-				// armMesh.setRotationFromMatrix(
-				// 	(new THREE.Matrix4).fromArray(hand.arm.matrix())
-				// );
-				// armMesh.quaternion.multiply(baseBoneRotation);
-				// armMesh.scale.x = hand.arm.width / 2;
-				// armMesh.scale.z = hand.arm.width / 2;
-			}
-		})
+						// console.log(hand.palmNormal)
+						// armMesh.setRotationFromMatrix(
+						// 	(new THREE.Matrix4).fromArray(hand.arm.matrix())
+						// );
+						// armMesh.quaternion.multiply(baseBoneRotation);
+						// armMesh.scale.x = hand.arm.width / 2;
+						// armMesh.scale.z = hand.arm.width / 2;
+				})
+				// {
+				// 	hand: function(hand) {
+				// 		hand.fingers.forEach(function(finger) {
+				// 			finger.data('boneMeshes').forEach(function(mesh, i) {
+				// 				let bone = finger.bones[i];
+				// 				mesh.position.fromArray(bone.center());
+				// 				mesh.setRotationFromMatrix(
+				// 					(new THREE.Matrix4).fromArray(bone.matrix())
+				// 				);
+				// 				mesh.quaternion.multiply(baseBoneRotation);
+				// 			});
+				// 			finger.data('jointMeshes').forEach(function(mesh, i) {
+				// 				let bone = finger.bones[i];
+				// 				if (bone) {
+				// 					mesh.position.fromArray(bone.prevJoint);
+				// 				} else {
+				// 					// special case for the finger tip joint sphere:
+				// 					bone = finger.bones[i - 1];
+				// 					mesh.position.fromArray(bone.nextJoint);
+				// 				}
+				// 			});
+				// 		});
+				// 		let engineBodyMesh = hand.data('engineBodyMesh');
+				// 		let convertedPositionMatrix = hand.fingers[2].bones[0].center().map(function(value) {
+				// 			return value;
+				// 		});
+				// 		convertedPositionMatrix[1] = convertedPositionMatrix[1] - 50;
+				// 		engineBodyMesh.position.fromArray(convertedPositionMatrix);
+
+				// 		let convertedRotationMatrix = hand.fingers[2].bones[0].matrix().map(function(value) {
+				// 			return value;
+				// 		});
+				// 		// console.log(convertedRotationMatrix)
+				// 		// convertedRotationMatrix = new THREE.Matrix4).fromArray(convertedRotationMatrix);
+				// 		// convertedRotationMatrix[12] = convertedRotationMatrix[12] *2;
+				// 		// console.log(hand.palmNormal)
+				// 		// convertedRotationMatrix.makeRotationAxis(new THREE.Vector3(hand.palmNormal).normalize(),(90 * 3.14 / 180));
+				// 		// convertedRotationMatrix = (new THREE.Matrix4).fromArray(convertedRotationMatrix)
+				// 		// convertedRotationMatrix = convertedRotationMatrix.makeRotationAxis(hand.palmNormal,90 * 3.14 / 180)
+				// 		// convertedRotationMatrix.setPosition(new THREE.Vector3(2, 1, 2))
+				// 		// convertedRotationMatrix.transpose();
+				// 		// console.log(convertedRotationMatrix)
+				// 		// engineBodyMesh.setRotationFromMatrix(
+				// 		// 	convertedRotationMatrix
+				// 		// );
+				// 		// engineBodyMesh.quaternion.multiply(armRotation);
+				// 		// debugger
+				// 		// armMesh.position.fromArray(hand.arm.center());
+				// 		// armMesh.position.fromArray(hand.palmPosition);
+				// 		// armMesh.rotation.fromArray(hand.palmNormal);
+
+				// 		// console.log(hand.palmNormal)
+				// 		// armMesh.setRotationFromMatrix(
+				// 		// 	(new THREE.Matrix4).fromArray(hand.arm.matrix())
+				// 		// );
+				// 		// armMesh.quaternion.multiply(baseBoneRotation);
+				// 		// armMesh.scale.x = hand.arm.width / 2;
+				// 		// armMesh.scale.z = hand.arm.width / 2;
+				// 	}
+				// }
+			})
 		// these two LeapJS plugins, handHold and handEntry are available from leapjs-plugins, included above.
 		// handHold provides hand.data
 		// handEntry provides handFound/handLost events.
@@ -284,7 +366,7 @@ window.onload = function() {
 				finger.data('boneMeshes', boneMeshes);
 				finger.data('jointMeshes', jointMeshes);
 			});
-			console.log(hand)
+			// console.log(hand)
 			// console.log(hand);
 			if (hand.arm) { // 2.0.3+ have arm api,
 				// CylinderGeometry(radiusTop, radiusBottom, height, radiusSegments, heightSegments, openEnded)
@@ -301,7 +383,7 @@ window.onload = function() {
 				new THREE.TorusBufferGeometry(30, 10, 16, 60),
 				new THREE.MeshStandardMaterial({ metalness: 0.9, roughness: 0.4, color: 0x007700, envMap: textureCube })
 			);
-			scene.add(engineBodyMesh);
+			// scene.add(engineBodyMesh);
 			hand.data('engineBodyMesh', engineBodyMesh);
 
 		})
