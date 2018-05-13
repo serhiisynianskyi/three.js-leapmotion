@@ -4,17 +4,17 @@ window.onload = function() {
 		scene = new THREE.Scene(),
 		camera, renderer, light, controls, stats, textureCube,
 		fingers = [],
+		isCatalogueCreated = false,
 		currentPlayingVideo;
 
 	function initScene() {
 		camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 9000);
 		renderer = new THREE.WebGLRenderer({ antialias: true, canvas: canvas }); // antialias - сглаживаем ребра
-		camera.position.set(0, 0, 600);
-		camera.rotation.set(-0.72, 0, 0);
+		camera.position.set(0, 600, 800);
 		renderer.shadowMap.enabled = true;
 		renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 		// renderer.setPixelRatio(window.devicePixelRatio > 1 ? 2 : 1);
-		renderer.setSize(window.innerWidth, window.innerHeight);
+		renderer.setSize(window.innerWidth, window.innerHeight - 5);
 		renderer.gammaInput = renderer.gammaOutput = true;
 		renderer.toneMapping = THREE.LinearToneMapping;
 		// renderer.toneMappingExposure = 1;
@@ -22,45 +22,45 @@ window.onload = function() {
 		textureCube = new THREE.CubeTextureLoader()
 			.setPath('./cube/dark_dust/')
 			.load(['sleepyhollow_ft.jpg', 'sleepyhollow_bk.jpg', 'sleepyhollow_up.jpg', 'sleepyhollow_dn.jpg', 'sleepyhollow_rt.jpg', 'sleepyhollow_lf.jpg']);
-		// 	// .setPath('./cube/space/')
-		// .load(['2.png', '4.png', '5.png', '6.png', '3.png', '1.png']);
-		// scene.background = textureCube;
 	}
 
 	let videosArray = [],
-		videoWidth = 300,
+		videoWidth = 500,
 		catalogueMesh = new THREE.Group(),
-		
+
 		videosCatalogue = [{
-			name: "media/video1.mp4",
-			position: [0, 0, videoWidth],
-			rotation: 0
-		},
-		{
-			name: "media/video2.webm",
-			position: [videoWidth, 0, 0],
-			rotation: 90
-		},
-		{
-			name: "media/video3.mp4",
-			position: [0, 0, -videoWidth],
-			rotation: 180
-		},
-		{
-			name: "media/video4.webm",
-			position: [-videoWidth, 0, 0],
-			rotation: 270
-		}
-	]
+				name: "media/video1.mp4",
+				position: [0, 0, videoWidth],
+				rotation: 0
+			},
+			{
+				name: "media/video2.webm",
+				position: [videoWidth, 0, 0],
+				rotation: 90
+			},
+			{
+				name: "media/video3.mp4",
+				position: [0, 0, -videoWidth],
+				rotation: 180
+			},
+			{
+				name: "media/video4.webm",
+				position: [-videoWidth, 0, 0],
+				rotation: 270
+			}
+		]
 
 	function createCatalogue() {
-		for (let video in videosCatalogue) {
-			createVideos(videosCatalogue[video], video)
+		if (!isCatalogueCreated) {
+			for (let video in videosCatalogue) {
+				createVideos(videosCatalogue[video], video)
+			}
+			catalogueMesh.position.set(0, 400, -650)
+			catalogueMesh.rotation.set(0, Math.PI / 2, 0)
+			scene.add(catalogueMesh);
+			isCatalogueCreated = true;
 		}
-		catalogueMesh.position.set(0, 200, -300)
-		catalogueMesh.rotation.set(0,Math.PI/2,0)
-		scene.add(catalogueMesh);
-		// videosArray[0].play();
+
 	}
 
 	function createVideos(videoItem, index) {
@@ -92,7 +92,7 @@ window.onload = function() {
 
 	function playVideo(index) {
 		if (index !== currentPlayingVideo) {
-			videosArray.forEach(function(item){
+			videosArray.forEach(function(item) {
 				item.pause();
 			});
 			videosArray[index].play();
@@ -113,6 +113,7 @@ window.onload = function() {
 							collisionResults = ray.intersectObjects(catalogueMesh.children);
 						if (collisionResults.length > 0 && collisionResults[0].distance < directionVector.length())
 							playVideo(collisionResults[0].object.videoIndex);
+					}
 				}
 			});
 		};
@@ -146,7 +147,6 @@ window.onload = function() {
 				new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load('cube/dark_dust/sleepyhollow_rt.jpg'), side: THREE.DoubleSide }),
 				new THREE.MeshBasicMaterial({ map: new THREE.TextureLoader().load('cube/dark_dust/sleepyhollow_lf.jpg'), side: THREE.DoubleSide })
 			]));
-		// cubeMesh.rotation.set(0, 0.95, 0);
 		scene.add(cubeMesh);
 	}
 
@@ -156,10 +156,11 @@ window.onload = function() {
 	initScene();
 	addLights();
 	createSceneBackground();
-	createCatalogue();
 	rendering();
 
 	controls = new THREE.OrbitControls(camera);
+	camera.lookAt(0, 250, 0);
+	controls.target.z = -500;
 
 	function rendering() {
 		requestAnimationFrame(rendering);
@@ -169,8 +170,21 @@ window.onload = function() {
 		detectCollision();
 	};
 
+	function rotateCatalogue(hand) {
+		if (hand._rotation[4] < 0) {
+			catalogueMesh.rotation.y = catalogueMesh.rotation.y - 0.03;
+		} else {
+			catalogueMesh.rotation.y = catalogueMesh.rotation.y + 0.03;
+		}
+	}
+
 	window.addEventListener('resize', function(e) {
 		resize();
+	});
+	window.addEventListener('keypress', function(e) {
+		if (e.keyCode === 32) { // Space
+			createCatalogue();
+		}
 	});
 
 	let baseBoneRotation = (new THREE.Quaternion).setFromEuler(
@@ -205,7 +219,11 @@ window.onload = function() {
 				// 	});
 				// }
 				frame.hands.forEach(function(hand) {
-					window.x = frame.hands;
+					// debugger
+					if (hand.type === "left" && hand.pinchStrength > 0.7) {
+						rotateCatalogue(hand);
+					}
+
 					hand.fingers.forEach(function(finger) {
 						finger.data('boneMeshes').forEach(function(mesh, i) {
 							let bone = finger.bones[i];
@@ -359,7 +377,6 @@ window.onload = function() {
 						if (index === 2) {
 							boneType = new THREE.CylinderGeometry(13, 10, bone.length, 32, 2)
 						}
-
 					}
 					let boneMesh = new THREE.Mesh(
 						boneType,
@@ -367,10 +384,10 @@ window.onload = function() {
 					);
 					scene.add(boneMesh);
 					boneMeshes.push(boneMesh);
-					if(fingerIndex === 1 && index === 3) {
+					if (fingerIndex === 1 && index === 3) { // Direct finger
+						boneMesh['parentHand'] = hand.type;
 						fingers.push(boneMesh);
 					}
-					
 				});
 				for (let i = 0; i < finger.bones.length + 1; i++) {
 					let jointMeshGeometryParam = 9.5,
@@ -402,7 +419,7 @@ window.onload = function() {
 					new THREE.MeshStandardMaterial({ metalness: 0.9, roughness: 0.4, color: 0x450000, envMap: textureCube })
 				);
 				// armMesh.material.color.setHex(0xffffff);
-				scene.add(armMesh);
+				// scene.add(armMesh);
 				hand.data('armMesh', armMesh);
 			}
 			// add engine
@@ -433,6 +450,11 @@ window.onload = function() {
 					boneMeshes: null
 				});
 
+			});
+			fingers.forEach(function(finger) {
+				if(hand.type === finger.parentHand){
+					fingers.splice(finger, 1);
+				}
 			});
 			let armMesh = hand.data('armMesh');
 			scene.remove(armMesh);
