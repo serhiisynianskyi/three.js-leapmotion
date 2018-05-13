@@ -1,8 +1,10 @@
 "use strict";
 window.onload = function() {
-	let canvas = document.getElementById('canvas');
-	let scene = new THREE.Scene();
-	let camera, renderer, light, controls, stats, textureCube;
+	let canvas = document.getElementById('canvas'),
+		scene = new THREE.Scene(),
+		camera, renderer, light, controls, stats, textureCube,
+		fingers = [],
+		currentPlayingVideo;
 
 	function initScene() {
 		camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 9000);
@@ -27,13 +29,9 @@ window.onload = function() {
 
 	let videosArray = [],
 		videoWidth = 300,
-		catalogueMesh = new THREE.Group();
-		window.z = videosArray;
-	// video.src = "video3.webm";
-	// video.load(); // must call after setting/changing source
-	// video.play();
-
-	let videosCatalogue = [{
+		catalogueMesh = new THREE.Group(),
+		
+		videosCatalogue = [{
 			name: "media/video1.mp4",
 			position: [0, 0, videoWidth],
 			rotation: 0
@@ -57,38 +55,67 @@ window.onload = function() {
 
 	function createCatalogue() {
 		for (let video in videosCatalogue) {
-			createVideos(videosCatalogue[video])
+			createVideos(videosCatalogue[video], video)
 		}
 		catalogueMesh.position.set(0, 200, -300)
+		catalogueMesh.rotation.set(0,Math.PI/2,0)
 		scene.add(catalogueMesh);
 		// videosArray[0].play();
 	}
 
-	function createVideos(videoItem) {
+	function createVideos(videoItem, index) {
 		let video = document.createElement('video');
 		video.src = videoItem.name;
 		video.load();
-		catalogueMesh.add(createVideoMesh(video, videoItem));
+		catalogueMesh.add(createVideoMesh(video, videoItem, index));
 		videosArray.push(video);
 	}
 
-	function createVideoMesh(video, videoItem) {
+	function createVideoMesh(video, videoItem, index) {
 		let texture = new THREE.VideoTexture(video);
 		texture.minFilter = THREE.LinearFilter;
 		texture.magFilter = THREE.LinearFilter;
-		let videoMaterial = new THREE.MeshBasicMaterial({ map: texture, overdraw: 0.5, side: THREE.DoubleSide }),
-			videoGeometry = new THREE.PlaneGeometry(videoWidth * 2, videoWidth * 1.2, 4, 4),
+		let videoMaterial = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide }),
+			videoGeometry = new THREE.PlaneGeometry(videoWidth * 2, videoWidth * 1.2, 1, 1),
 			videoMesh = new THREE.Mesh(videoGeometry, videoMaterial);
 		videoMesh.position.set(...videoItem.position)
 		videoMesh.rotation.y = (videoItem.rotation * Math.PI) / 180;
+		videoMesh.videoIndex = index;
 		return videoMesh;
 	}
-
 
 	function resize() {
 		camera.aspect = window.innerWidth / window.innerHeight;
 		renderer.setSize(window.innerWidth - 5, window.innerHeight - 5);
 		camera.updateProjectionMatrix()
+	}
+
+	function playVideo(index) {
+		if (index !== currentPlayingVideo) {
+			videosArray.forEach(function(item){
+				item.pause();
+			});
+			videosArray[index].play();
+			currentPlayingVideo = index;
+		}
+	}
+
+	function detectCollision() {
+		if (fingers.length !== 0) {
+			fingers.forEach(function(finger) {
+				let originPoint = finger.position.clone();
+				if (finger.geometry.vertices) {
+					for (let vertexIndex = 0; vertexIndex < finger.geometry.vertices.length; vertexIndex++) {
+						let localVertex = finger.geometry.vertices[vertexIndex].clone(),
+							globalVertex = localVertex.applyMatrix4(finger.matrix),
+							directionVector = localVertex.sub(finger.position),
+							ray = new THREE.Raycaster(originPoint, directionVector.clone().normalize()),
+							collisionResults = ray.intersectObjects(catalogueMesh.children);
+						if (collisionResults.length > 0 && collisionResults[0].distance < directionVector.length())
+							playVideo(collisionResults[0].object.videoIndex);
+				}
+			});
+		};
 	}
 
 	function addLights() {
@@ -133,14 +160,13 @@ window.onload = function() {
 	rendering();
 
 	controls = new THREE.OrbitControls(camera);
-	// stats = new Stats();
-	// window.fps.appendChild(stats.dom);
 
 	function rendering() {
 		requestAnimationFrame(rendering);
 		renderer.render(scene, camera);
 		stats.begin();
 		stats.end();
+		detectCollision();
 	};
 
 	window.addEventListener('resize', function(e) {
@@ -160,81 +186,82 @@ window.onload = function() {
 			function(frame) {
 				// debugger
 				// console.log(frame);
-				if (frame.valid && frame.gestures.length > 0) {
-					frame.gestures.forEach(function(gesture) {
-						switch (gesture.type) {
-							case "circle":
-								console.log("Circle Gesture");
-								break;
-							case "keyTap":
-								console.log("Key Tap Gesture");
-								break;
-							case "screenTap":
-								console.log("Screen Tap Gesture");
-								break;
-							case "swipe":
-								console.log("Swipe Gesture");
-								break;
-						}
-					});
-				} 
+				// if (frame.valid && frame.gestures.length > 0) {
+				// 	frame.gestures.forEach(function(gesture) {
+				// 		switch (gesture.type) {
+				// 			case "circle":
+				// 				console.log("Circle Gesture");
+				// 				break;
+				// 			case "keyTap":
+				// 				console.log("Key Tap Gesture");
+				// 				break;
+				// 			case "screenTap":
+				// 				console.log("Screen Tap Gesture");
+				// 				break;
+				// 			case "swipe":
+				// 				console.log("Swipe Gesture");
+				// 				break;
+				// 		}
+				// 	});
+				// }
 				frame.hands.forEach(function(hand) {
+					window.x = frame.hands;
 					hand.fingers.forEach(function(finger) {
-							finger.data('boneMeshes').forEach(function(mesh, i) {
-								let bone = finger.bones[i];
-								mesh.position.fromArray(bone.center());
-								mesh.setRotationFromMatrix(
-									(new THREE.Matrix4).fromArray(bone.matrix())
-								);
-								mesh.quaternion.multiply(baseBoneRotation);
-							});
-							finger.data('jointMeshes').forEach(function(mesh, i) {
-								let bone = finger.bones[i];
-								if (bone) {
-									mesh.position.fromArray(bone.prevJoint);
-								} else {
-									// special case for the finger tip joint sphere:
-									bone = finger.bones[i - 1];
-									mesh.position.fromArray(bone.nextJoint);
-								}
-							});
+						finger.data('boneMeshes').forEach(function(mesh, i) {
+							let bone = finger.bones[i];
+							mesh.position.fromArray(bone.center());
+							mesh.setRotationFromMatrix(
+								(new THREE.Matrix4).fromArray(bone.matrix())
+							);
+							mesh.quaternion.multiply(baseBoneRotation);
 						});
-						let engineBodyMesh = hand.data('engineBodyMesh');
-						let convertedPositionMatrix = hand.fingers[2].bones[0].center().map(function(value) {
-							return value;
+						finger.data('jointMeshes').forEach(function(mesh, i) {
+							let bone = finger.bones[i];
+							if (bone) {
+								mesh.position.fromArray(bone.prevJoint);
+							} else {
+								// special case for the finger tip joint sphere:
+								bone = finger.bones[i - 1];
+								mesh.position.fromArray(bone.nextJoint);
+							}
 						});
-						convertedPositionMatrix[1] = convertedPositionMatrix[1] - 50;
-						engineBodyMesh.position.fromArray(convertedPositionMatrix);
+					});
+					let engineBodyMesh = hand.data('engineBodyMesh');
+					let convertedPositionMatrix = hand.fingers[2].bones[0].center().map(function(value) {
+						return value;
+					});
+					convertedPositionMatrix[1] = convertedPositionMatrix[1] - 50;
+					engineBodyMesh.position.fromArray(convertedPositionMatrix);
 
-						let convertedRotationMatrix = hand.fingers[2].bones[0].matrix().map(function(value) {
-							return value;
-						});
-						// console.log(convertedRotationMatrix)
-						// convertedRotationMatrix = new THREE.Matrix4).fromArray(convertedRotationMatrix);
-						// convertedRotationMatrix[12] = convertedRotationMatrix[12] *2;
-						// console.log(hand.palmNormal)
-						// convertedRotationMatrix.makeRotationAxis(new THREE.Vector3(hand.palmNormal).normalize(),(90 * 3.14 / 180));
-						// convertedRotationMatrix = (new THREE.Matrix4).fromArray(convertedRotationMatrix)
-						// convertedRotationMatrix = convertedRotationMatrix.makeRotationAxis(hand.palmNormal,90 * 3.14 / 180)
-						// convertedRotationMatrix.setPosition(new THREE.Vector3(2, 1, 2))
-						// convertedRotationMatrix.transpose();
-						// console.log(convertedRotationMatrix)
-						// engineBodyMesh.setRotationFromMatrix(
-						// 	convertedRotationMatrix
-						// );
-						// engineBodyMesh.quaternion.multiply(armRotation);
-						// debugger
-						// armMesh.position.fromArray(hand.arm.center());
-						// armMesh.position.fromArray(hand.palmPosition);
-						// armMesh.rotation.fromArray(hand.palmNormal);
+					let convertedRotationMatrix = hand.fingers[2].bones[0].matrix().map(function(value) {
+						return value;
+					});
+					// console.log(convertedRotationMatrix)
+					// convertedRotationMatrix = new THREE.Matrix4).fromArray(convertedRotationMatrix);
+					// convertedRotationMatrix[12] = convertedRotationMatrix[12] *2;
+					// console.log(hand.palmNormal)
+					// convertedRotationMatrix.makeRotationAxis(new THREE.Vector3(hand.palmNormal).normalize(),(90 * 3.14 / 180));
+					// convertedRotationMatrix = (new THREE.Matrix4).fromArray(convertedRotationMatrix)
+					// convertedRotationMatrix = convertedRotationMatrix.makeRotationAxis(hand.palmNormal,90 * 3.14 / 180)
+					// convertedRotationMatrix.setPosition(new THREE.Vector3(2, 1, 2))
+					// convertedRotationMatrix.transpose();
+					// console.log(convertedRotationMatrix)
+					// engineBodyMesh.setRotationFromMatrix(
+					// 	convertedRotationMatrix
+					// );
+					// engineBodyMesh.quaternion.multiply(armRotation);
+					// debugger
+					// armMesh.position.fromArray(hand.arm.center());
+					// armMesh.position.fromArray(hand.palmPosition);
+					// armMesh.rotation.fromArray(hand.palmNormal);
 
-						// console.log(hand.palmNormal)
-						// armMesh.setRotationFromMatrix(
-						// 	(new THREE.Matrix4).fromArray(hand.arm.matrix())
-						// );
-						// armMesh.quaternion.multiply(baseBoneRotation);
-						// armMesh.scale.x = hand.arm.width / 2;
-						// armMesh.scale.z = hand.arm.width / 2;
+					// console.log(hand.palmNormal)
+					// armMesh.setRotationFromMatrix(
+					// 	(new THREE.Matrix4).fromArray(hand.arm.matrix())
+					// );
+					// armMesh.quaternion.multiply(baseBoneRotation);
+					// armMesh.scale.x = hand.arm.width / 2;
+					// armMesh.scale.z = hand.arm.width / 2;
 				})
 				// {
 				// 	hand: function(hand) {
@@ -297,7 +324,6 @@ window.onload = function() {
 				// 	}
 				// }
 			})
-		// these two LeapJS plugins, handHold and handEntry are available from leapjs-plugins, included above.
 		// handHold provides hand.data
 		// handEntry provides handFound/handLost events.
 		.use('handHold')
@@ -341,6 +367,10 @@ window.onload = function() {
 					);
 					scene.add(boneMesh);
 					boneMeshes.push(boneMesh);
+					if(fingerIndex === 1 && index === 3) {
+						fingers.push(boneMesh);
+					}
+					
 				});
 				for (let i = 0; i < finger.bones.length + 1; i++) {
 					let jointMeshGeometryParam = 9.5,
@@ -366,10 +396,7 @@ window.onload = function() {
 				finger.data('boneMeshes', boneMeshes);
 				finger.data('jointMeshes', jointMeshes);
 			});
-			// console.log(hand)
-			// console.log(hand);
 			if (hand.arm) { // 2.0.3+ have arm api,
-				// CylinderGeometry(radiusTop, radiusBottom, height, radiusSegments, heightSegments, openEnded)
 				armMesh = new THREE.Mesh(
 					new THREE.CylinderGeometry(2.5, .9, hand.arm.length + 10, 32, 2),
 					new THREE.MeshStandardMaterial({ metalness: 0.9, roughness: 0.4, color: 0x450000, envMap: textureCube })
@@ -390,9 +417,8 @@ window.onload = function() {
 		.on('handLost', function(hand) {
 			console.log('Hand lost');
 			hand.fingers.forEach(function(finger) {
-
-				let boneMeshes = finger.data('boneMeshes');
-				let jointMeshes = finger.data('jointMeshes');
+				let boneMeshes = finger.data('boneMeshes'),
+					jointMeshes = finger.data('jointMeshes');
 
 				boneMeshes.forEach(function(mesh) {
 					scene.remove(mesh);
